@@ -7207,10 +7207,54 @@
 			} else {
 				initRSVP();
 			}
-			// Delay juga untuk override SAIC yang load async
-			setTimeout(initRSVP, 800);
-			setTimeout(initRSVP, 2000);
-		})();
+	// Delay juga untuk override SAIC yang load async
+	setTimeout(initRSVP, 800);
+	setTimeout(initRSVP, 2000);
+
+	// === Tamu Undangan dari URL ?to= / #to= ===
+	(function(){
+		function getGuestName(){
+			let to = null;
+			// Cek hash #to= atau #to=...&...
+			if(location.hash && location.hash.includes("to=")){
+				const hashParams = new URLSearchParams(location.hash.substring(1));
+				to = hashParams.get("to");
+			}
+			// Cek search ?to=
+			if(!to && location.search && location.search.includes("to=")){
+				const searchParams = new URLSearchParams(location.search);
+				to = searchParams.get("to");
+			}
+			// Fallback: hash tanpa ? seperti #to=Syafiq%20%26%20Yudela
+			if(!to && location.hash){
+				const m = location.hash.match(/to=([^&]+)/);
+				if(m) to = decodeURIComponent(m[1].replace(/\+/g," "));
+			}
+			return to ? decodeURIComponent(to.replace(/\+/g," ")) : null;
+		}
+		function updateGuestName(){
+			const nama = getGuestName();
+			if(!nama) return;
+			// Cari elemen Tamu Undangan (data-id 2f25a4d)
+			let el = document.querySelector('[data-id="2f25a4d"] .elementor-heading-title');
+			if(!el){
+				// Fallback cari h2 yang berisi Tamu Undangan
+				el = Array.from(document.querySelectorAll(".elementor-heading-title")).find(e=> e.textContent.trim()==="Tamu Undangan");
+			}
+			if(el){
+				el.textContent = nama;
+				// Juga update title/description jika mau
+				document.title = "Undangan untuk " + nama + " — Anis & Faisal";
+			}
+		}
+		if(document.readyState==="loading"){
+			document.addEventListener("DOMContentLoaded", updateGuestName);
+		} else {
+			updateGuestName();
+		}
+		window.addEventListener("hashchange", updateGuestName);
+	})();
+})();
 	</script>
 </body>
 
