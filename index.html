@@ -7085,7 +7085,8 @@
 						setTimeout(() => { if (statusEl) statusEl.innerHTML = ""; }, 4000);
 					} catch (err) {
 						console.error(err);
-						if (statusEl) statusEl.innerHTML = '<p style="color:#c00;text-align:center;">Gagal mengirim, coba lagi</p>';
+						const why = (err && err.name === "AbortError") ? "timeout" : ((err && err.message) ? err.message : "jaringan");
+						if (statusEl) statusEl.innerHTML = '<p style="color:#c00;text-align:center;">Gagal mengirim (' + escapeHtml(why) + '), coba lagi</p>';
 					} finally {
 						if (submitBtn) { submitBtn.disabled = false; submitBtn.value = "Kirim"; }
 						form._sending = false;
@@ -7097,6 +7098,16 @@
 				if (window.jQuery) {
 					try { jQuery(form).off("submit").on("submit", handleSubmit); } catch (e) { }
 				}
+				// Jalur klik langsung (guarded): ucapan yang sudah masuk sheet selama ini
+				// terkirim lewat jalur klik. Dijaga flag _sending sehingga tetap 1x eksekusi
+				// walau click + submit sama-sama fire.
+				(function () {
+					const btn = document.getElementById("submit-6854");
+					if (btn && !btn._rsvpClickBound) {
+						btn._rsvpClickBound = true;
+						btn.addEventListener("click", function (e) { handleSubmit(e); });
+					}
+				})();
 				// Tombol Tampilkan Ucapan di bawah Kirim
 				let toggleBtn = document.getElementById("btn-toggle-ucapan");
 				if (!toggleBtn) {
