@@ -7051,7 +7051,8 @@
 							li.dataset.key = keyOf(nama, ucapan);
 							li.style = "padding:12px;border-bottom:1px solid #eee;animation:fadeIn 0.4s;background:#fff;";
 							const hadirText = hadir === "present" ? "Hadir" : hadir === "notpresent" ? "Tidak Hadir" : hadir;
-							li.innerHTML = '<div style="font-weight:600;color:#685952;">' + escapeHtml(nama) + ' <span style="font-weight:400;font-size:12px;color:#999;"> - ' + hadirText + ' (' + tamu + ' orang)</span></div><div style="margin-top:6px;color:#333;white-space:pre-wrap;">' + escapeHtml(ucapan) + '</div><div style="font-size:11px;color:#aaa;margin-top:4px;">' + new Date().toLocaleString("id-ID") + ' WIB</div>';
+							const tamuText = (hadir === "present") ? ' (' + tamu + ' orang)' : '';
+							li.innerHTML = '<div style="font-weight:600;color:#685952;">' + escapeHtml(nama) + ' <span style="font-weight:400;font-size:12px;color:#999;"> - ' + hadirText + tamuText + '</span></div><div style="margin-top:6px;color:#333;white-space:pre-wrap;">' + escapeHtml(ucapan) + '</div><div style="font-size:11px;color:#aaa;margin-top:4px;">' + new Date().toLocaleString("id-ID") + ' WIB</div>';
 							listEl.prepend(li);
 							// Paksa tampil (SAIC awalnya display:none & jPages hidden)
 							li.classList.remove("jp-hidden", "animated");
@@ -7229,8 +7230,9 @@
 								li.dataset.key = k;
 								li.style = "padding:12px;border-bottom:1px solid #eee;background:#fff;";
 								const hadirText = item.kehadiran === "present" ? "Hadir" : item.kehadiran === "notpresent" ? "Tidak Hadir" : item.kehadiran;
+								const tamuText = (item.kehadiran === "present") ? ' (' + escapeHtml(item.jumlah_tamu || "1") + ' orang)' : '';
 								const tgl = item.timestamp ? new Date(item.timestamp).toLocaleString("id-ID") + " WIB" : "";
-								li.innerHTML = '<div style="font-weight:600;color:#685952;">' + escapeHtml(item.nama) + ' <span style="font-weight:400;font-size:12px;color:#999;"> - ' + escapeHtml(hadirText) + ' (' + escapeHtml(item.jumlah_tamu || "1") + ' orang)</span></div><div style="margin-top:6px;color:#333;white-space:pre-wrap;">' + escapeHtml(item.ucapan) + '</div><div style="font-size:11px;color:#aaa;margin-top:4px;">' + escapeHtml(tgl) + '</div>';
+								li.innerHTML = '<div style="font-weight:600;color:#685952;">' + escapeHtml(item.nama) + ' <span style="font-weight:400;font-size:12px;color:#999;"> - ' + escapeHtml(hadirText) + tamuText + '</span></div><div style="margin-top:6px;color:#333;white-space:pre-wrap;">' + escapeHtml(item.ucapan) + '</div><div style="font-size:11px;color:#aaa;margin-top:4px;">' + escapeHtml(tgl) + '</div>';
 								listEl.appendChild(li);
 							});
 							const tBtnL = document.getElementById("btn-toggle-ucapan");
