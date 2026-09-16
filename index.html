@@ -6965,24 +6965,30 @@
 			function initRSVP() {
 				const form = document.getElementById("commentform-6854");
 				if (!form) return;
+				// Override SAIC di SETIAP tick (wds-rsvp.js load async dan pasang handler
+				// submit sendiri ke WordPress AJAX yang 404 di hosting statis).
+				if (window.jQuery) {
+					try { jQuery("body").off("submit", ".saic-container-form form"); } catch (e) { }
+				}
+				if (typeof window.insertComment_SAIC === "function") {
+					window.insertComment_SAIC = function () { return false; };
+				}
 				// Guard: initRSVP dipanggil 3x (DOMContentLoaded + 2x setTimeout).
 				// Tanpa guard, submit handler & loadRSVP terpasang 3x -> 1 ucapan jadi 3-4x tampil.
-				if (form._rsvpBound) return;
+				// Override SAIC di atas harus tetap jalan tiap tick, jadi guard dipasang setelahnya.
+				if (form._rsvpBound) {
+					// Pastikan handler kita tetap yang terakhir terpasang di jQuery
+					if (window.jQuery) {
+						try { jQuery(form).off("submit").on("submit", handleSubmit); } catch (e) { }
+					}
+					return;
+				}
 				form._rsvpBound = true;
 				const statusEl = document.getElementById("saic-comment-status-6854");
 				const listEl = document.getElementById("saic-container-comment-6854");
 				const submitBtn = document.getElementById("submit-6854");
 				const attendanceInput = document.getElementById("attendance");
 				const guestSelect = document.getElementById("guest");
-
-				// Hapus handler bawaan SAIC agar tidak conflict (WordPress AJAX akan 404 di hosting statis)
-				if (window.jQuery) {
-					try { jQuery("body").off("submit", ".saic-container-form form"); } catch (e) { }
-				}
-				// Override fungsi SAIC jika ada
-				if (typeof window.insertComment_SAIC === "function") {
-					window.insertComment_SAIC = function () { return false; };
-				}
 
 				// Attendance buttons - sync dengan handler SAIC (active + rvspSelect)
 				document.querySelectorAll("#optPresent, #optNotpresent").forEach(btn => {
@@ -7004,9 +7010,9 @@
 					const ucapan = (document.getElementById("saic-textarea-6854") || {}).value?.trim() || "";
 					const hadir = attendanceInput ? attendanceInput.value : "";
 					const tamu = guestSelect ? guestSelect.value : "1";
-					if (nama.length < 2) { alert("Nama minimal 2 karakter"); return; }
-					if (ucapan.length < 2) { alert("Ucapan minimal 2 karakter"); return; }
-					if (!hadir || hadir === "notsure") { alert("Pilih konfirmasi kehadiran"); return; }
+					if (nama.length < 2) { showErr("Isi nama dulu ya (minimal 2 karakter)"); return; }
+					if (ucapan.length < 2) { showErr("Tulis ucapan dulu ya (minimal 2 karakter)"); return; }
+					if (!hadir || hadir === "notsure") { showErr("Pilih konfirmasi kehadiran (Hadir / Tidak Hadir)"); return; }
 					form._sending = true;
 					const payload = {
 						timestamp: new Date().toISOString(),
@@ -7021,12 +7027,20 @@
 					try {
 						// Kirim ke Google Sheets (no-cors agar tidak block, tapi tetap masuk)
 						if (SHEET_URL.indexOf("REPLACE_WITH") === -1) {
-							await fetch(SHEET_URL, {
-								method: "POST",
-								mode: "no-cors",
-								headers: { "Content-Type": "text/plain;charset=utf-8" },
-								body: JSON.stringify(payload)
-							});
+							// Timeout 25 detik agar tombol tidak macet di "Mengirim..." kalau jaringan lemot
+							const ctrl = ("AbortController" in window) ? new AbortController() : null;
+							const timer = ctrl ? setTimeout(() => { try { ctrl.abort(); } catch (e) { } }, 25000) : null;
+							try {
+								await fetch(SHEET_URL, {
+									method: "POST",
+									mode: "no-cors",
+									headers: { "Content-Type": "text/plain;charset=utf-8" },
+									body: JSON.stringify(payload),
+									signal: ctrl ? ctrl.signal : undefined
+								});
+							} finally {
+								if (timer) clearTimeout(timer);
+							}
 						} else {
 							console.warn("SHEET_URL belum diganti, data hanya tampil lokal");
 						}
@@ -7127,6 +7141,14 @@
 					form._setShown = (v) => { isShown = v; };
 				}
 				function escapeHtml(s) { return String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
+				// Pesan error validasi tampil inline di bawah form (alert sering diblokir
+				// webview/iframe sehingga dikira tombol Kirim tidak berfungsi).
+				function showErr(msg) {
+					if (statusEl) {
+						statusEl.innerHTML = '<p style="color:#c00;text-align:center;">' + escapeHtml(msg) + '</p>';
+						setTimeout(() => { if (statusEl && !form._sending) statusEl.innerHTML = ""; }, 3500);
+					} else { alert(msg); }
+				}
 				// Key dedup full (nama + ucapan penuh, lowercase, trim).
 				// Jangan pakai substring(0,20): memotong emoji di tengah surrogate pair
 				// sehingga includes() tidak pernah match -> tiap load append duplikat.
