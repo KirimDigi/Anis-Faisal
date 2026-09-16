@@ -6965,6 +6965,10 @@
 			function initRSVP() {
 				const form = document.getElementById("commentform-6854");
 				if (!form) return;
+				// Guard: initRSVP dipanggil 3x (DOMContentLoaded + 2x setTimeout).
+				// Tanpa guard, submit handler & loadRSVP terpasang 3x -> 1 ucapan jadi 3-4x tampil.
+				if (form._rsvpBound) return;
+				form._rsvpBound = true;
 				const statusEl = document.getElementById("saic-comment-status-6854");
 				const listEl = document.getElementById("saic-container-comment-6854");
 				const submitBtn = document.getElementById("submit-6854");
@@ -6993,6 +6997,9 @@
 
 				async function handleSubmit(e) {
 					if (e) { e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation(); }
+					// Cegah double-submit: tombol Kirim memicu event click + submit sekaligus,
+					// tanpa guard 1x klik = 2x prepend + 2x POST.
+					if (form._sending) return;
 					const nama = (document.getElementById("author") || {}).value?.trim() || "";
 					const ucapan = (document.getElementById("saic-textarea-6854") || {}).value?.trim() || "";
 					const hadir = attendanceInput ? attendanceInput.value : "";
@@ -7000,6 +7007,7 @@
 					if (nama.length < 2) { alert("Nama minimal 2 karakter"); return; }
 					if (ucapan.length < 2) { alert("Ucapan minimal 2 karakter"); return; }
 					if (!hadir || hadir === "notsure") { alert("Pilih konfirmasi kehadiran"); return; }
+					form._sending = true;
 					const payload = {
 						timestamp: new Date().toISOString(),
 						nama: nama,
@@ -7026,6 +7034,7 @@
 						if (listEl) {
 							const li = document.createElement("li");
 							li.className = "saic-comment saic-local";
+							li.dataset.key = keyOf(nama, ucapan);
 							li.style = "padding:12px;border-bottom:1px solid #eee;animation:fadeIn 0.4s;background:#fff;";
 							const hadirText = hadir === "present" ? "Hadir" : hadir === "notpresent" ? "Tidak Hadir" : hadir;
 							li.innerHTML = '<div style="font-weight:600;color:#685952;">' + escapeHtml(nama) + ' <span style="font-weight:400;font-size:12px;color:#999;"> - ' + hadirText + ' (' + tamu + ' orang)</span></div><div style="margin-top:6px;color:#333;white-space:pre-wrap;">' + escapeHtml(ucapan) + '</div><div style="font-size:11px;color:#aaa;margin-top:4px;">' + new Date().toLocaleString("id-ID") + ' WIB</div>';
@@ -7065,16 +7074,14 @@
 						if (statusEl) statusEl.innerHTML = '<p style="color:#c00;text-align:center;">Gagal mengirim, coba lagi</p>';
 					} finally {
 						if (submitBtn) { submitBtn.disabled = false; submitBtn.value = "Kirim"; }
+						form._sending = false;
 					}
 				}
-				// Attach handlers
+				// Attach handlers - cukup form submit saja. Jangan tambah click handler
+				// di tombol submit (klik tombol otomatis memicu submit -> double).
 				form.addEventListener("submit", handleSubmit);
 				if (window.jQuery) {
 					try { jQuery(form).off("submit").on("submit", handleSubmit); } catch (e) { }
-					const btn = document.getElementById("submit-6854");
-					if (btn) btn.addEventListener("click", function (e) {
-						if (form) handleSubmit(e);
-					});
 				}
 				// Tombol Tampilkan Ucapan di bawah Kirim
 				let toggleBtn = document.getElementById("btn-toggle-ucapan");
@@ -7120,6 +7127,10 @@
 					form._setShown = (v) => { isShown = v; };
 				}
 				function escapeHtml(s) { return String(s).replace(/[&<>"']/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m])); }
+				// Key dedup full (nama + ucapan penuh, lowercase, trim).
+				// Jangan pakai substring(0,20): memotong emoji di tengah surrogate pair
+				// sehingga includes() tidak pernah match -> tiap load append duplikat.
+				function keyOf(nama, ucapan) { return String(nama || "").trim().toLowerCase() + "||" + String(ucapan || "").trim(); }
 
 				async function loadRSVP() {
 					// Load dari Google Sheets agar setelah reload tetap nampil
@@ -7176,11 +7187,13 @@
 							// Kosongkan dulu biar tidak duplikat saat reload
 							// listEl.innerHTML = "";
 							data.slice(0, 50).forEach(item => {
-								// Cek duplikat (jika sudah ada di listEl dengan nama+ucapan sama, skip)
-								const exists = Array.from(listEl.children).some(li => li.textContent.includes(item.nama) && li.textContent.includes(item.ucapan.substring(0, 20)));
+								// Cek duplikat full-key (tahan emoji & spasi). Skip jika sudah ada.
+								const k = keyOf(item.nama, item.ucapan);
+								const exists = Array.from(listEl.children).some(li => (li.dataset.key && li.dataset.key === k) || (item.nama && item.ucapan && li.textContent.includes(item.nama) && li.textContent.includes(item.ucapan)));
 								if (exists) return;
 								const li = document.createElement("li");
 								li.className = "saic-comment saic-local";
+								li.dataset.key = k;
 								li.style = "padding:12px;border-bottom:1px solid #eee;background:#fff;";
 								const hadirText = item.kehadiran === "present" ? "Hadir" : item.kehadiran === "notpresent" ? "Tidak Hadir" : item.kehadiran;
 								const tgl = item.timestamp ? new Date(item.timestamp).toLocaleString("id-ID") + " WIB" : "";
